@@ -1,0 +1,313 @@
+<div align="center">
+
+# 闽南中秋博饼模拟器
+
+**六颗骰子一只碗，一家人围坐争状元。**
+
+一个纯单机离线的浏览器应用，完整实现「厦门常见规则」的博饼玩法。
+
+[![License](https://img.shields.io/badge/license-MIT-2ea44f.svg)](./LICENSE)
+[![CI](https://github.com/Kenneth-G6/minnan-bobing/actions/workflows/ci.yml/badge.svg)](https://github.com/Kenneth-G6/minnan-bobing/actions/workflows/ci.yml)
+![React](https://img.shields.io/badge/React-18-61dafb.svg?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6.svg?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-5-646cff.svg?logo=vite&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-73%20passed-2ea44f.svg)
+![Offline](https://img.shields.io/badge/offline-100%25-ff9f1c.svg)
+
+[功能特性](#功能特性) · [快速开始](#快速开始) · [玩法](#玩法) · [规则](#规则) · [技术实现](#技术实现) · [测试](#测试)
+
+</div>
+
+---
+
+## 界面预览
+
+| 开始界面 | 游戏主界面 |
+| :---: | :---: |
+| ![开始界面](docs/screenshots/01-start.jpg) | ![游戏主界面](docs/screenshots/02-game.jpg) |
+
+| 掷骰结果 | 历史记录 | 结算界面 |
+| :---: | :---: | :---: |
+| ![掷骰结果](docs/screenshots/03-roll-result.jpg) | ![历史记录](docs/screenshots/04-history.jpg) | ![结算界面](docs/screenshots/05-settlement.jpg) |
+
+---
+
+## 功能特性
+
+- **完整规则实现** —— 13 级奖项判定链、状元比较、奖池递减、轮次推进、自动结算，全部按「厦门常见规则」写死，无地方差异配置
+- **规则与界面彻底解耦** —— 核心判定抽成纯函数，零 UI 依赖、可注入随机源，规则改动不需要碰组件
+- **离线可跑** —— 零后端、零运行时网络请求、无 CDN 外链，`dist/` 断网双击即玩
+- **中秋团圆氛围** —— 红灯笼、玉兔、桂花、月饼、博饼碗等装饰全部手绘内联 SVG；骰子旋转弹跳逐个落碗、奖项放大弹出带金色光效、状元加冕动画
+- **可选音效** —— WebAudio 实时合成掷骰声 / 中奖声 / 状元锣声，默认开启，可随时关闭并记住偏好
+- **响应式与无障碍** —— 适配窄屏单列布局，遵循系统「减少动态效果」偏好
+
+---
+
+## 快速开始
+
+### 环境要求
+
+| 项目 | 要求 |
+| :--- | :--- |
+| Node.js | ≥ 18（开发使用 v22） |
+| 浏览器 | Chrome / Edge / Safari / Firefox 近两年版本 |
+
+### 安装与运行
+
+```bash
+git clone https://github.com/Kenneth-G6/minnan-bobing.git
+cd minnan-bobing
+npm install
+npm run dev
+```
+
+浏览器打开终端提示的地址（默认 <http://localhost:5173>）即可开始。
+
+### 常用脚本
+
+| 命令 | 说明 |
+| :--- | :--- |
+| `npm run dev` | 启动开发服务器（Vite HMR） |
+| `npm run build` | 类型检查 + 生产构建，产物输出到 `dist/` |
+| `npm run preview` | 本地静态预览构建产物 |
+| `npm test` | 运行全部单元测试（Vitest，单次执行） |
+| `npm run test:watch` | 监听模式运行测试 |
+
+构建后 `dist/` 为纯静态资源，可直接用任意静态服务器托管，或断网双击 `dist/index.html` 运行。
+
+<details>
+<summary><b>关于 <code>.npmrc</code> 国内镜像</b></summary>
+
+仓库自带 `.npmrc` 指向 `registry.npmmirror.com`，用于国内网络下更稳定的安装。若不需要可删除该文件，改用官方源：
+
+```bash
+npm install --registry=https://registry.npmjs.org
+```
+
+</details>
+
+---
+
+## 玩法
+
+### 开始界面
+
+1. 调整**玩家人数**（2–12 人，默认 6 人），可用「−/+」按钮或滑块
+2. （可选）填写玩家姓名，留空自动使用「玩家N」
+3. （可选）右上角切换**音效开关**，默认开启并记住选择
+4. 点击 **开始博饼**；想先看规则可展开「看看规则速览」
+
+### 游戏主界面
+
+- 左侧列表显示全部玩家，**当前行动玩家高亮**，状元带皇冠标记
+- 中央是博饼碗，点击 **掷骰子** 后 6 颗骰子在碗上方旋转弹跳、逐个落入碗中并定格（约 1.2s）
+- 动画期间按钮禁用，防止连点导致状态错乱
+- 动画结束后结果区放大弹出奖项，并提示以下之一：
+  - `恭喜中奖 · XX`（普通奖成功发出）
+  - `XX 已满，无奖`（奖池发完，**不顺延**）
+  - `成为当前状元` / `替换当前状元` / `未超过当前状元`
+- 右侧上方为奖池（月饼卡片显示 剩余/总数），下方为历史记录（轮次 / 玩家 / 骰子 / 奖项）
+- 顶栏可随时切换音效，或「重新开始」（有二次确认，避免误触丢失本局记录）
+
+### 结算界面
+
+- 状元加冕动画（皇冠落下 + 金粉飘落 + 欢庆音效）
+- 「团圆战果」逐位列出奖品清单与数量，状元卡片优先排在最前
+- **重新开始** 回到开始界面；**再来一局（相同玩家）** 沿用名单直接开局
+
+---
+
+## 规则
+
+> 以下为写死的默认版本，从高到低匹配，**命中最高奖项后立即停止**。
+
+### 奖项判定表
+
+| 等级 | 奖项 | 骰子组合 |
+| :---: | :--- | :--- |
+| 12 | 状元插金花 | 4 个 4 + 2 个 1 |
+| 11 | 六杯红 | 6 个 4 |
+| 10 | 遍地锦 | 6 个 1 |
+| 9 | 六勃黑 | 6 个 2 / 3 / 5 / 6 |
+| 8 | 五王 | 5 个 4 |
+| 7 | 五子 | 5 个同点，且该点不是 4 |
+| 6 | 四红 | 4 个 4，且不是状元插金花 |
+| 5 | 对堂 | 1、2、3、4、5、6 各一个 |
+| 4 | 三红 | 3 个 4 |
+| 3 | 四进 | 4 个同点，且该点不是 4 |
+| 2 | 二举 | 2 个 4 |
+| 1 | 一秀 | 1 个 4 |
+| 0 | 无奖 | 其他组合 |
+
+**易错点**（均有测试覆盖）：
+
+- `4,4,4,4,1,1` 是状元插金花，**不是**四红
+- `1,2,3,4,5,6` 是对堂，**不是**一秀
+- `5,5,5,5,5,6` 是五子，**不是**四进
+- 六个 1 是遍地锦，**不是**六勃黑
+- 四进排除四个 4；五子排除五个 4
+
+### 奖品数量
+
+一秀 32 · 二举 16 · 四进 8 · 三红 4 · 对堂 2 · 状元 1
+
+### 普通奖发放
+
+一秀 / 二举 / 四进 / 三红 / 对堂：**先到先得**，奖池有货就发并减 1；池空则本次记「该奖项已满，无奖」，**绝不向下顺延**（对堂发完不能改拿三红）。
+
+### 状元比较
+
+系统维护一个「当前状元」：
+
+- 第一个掷出状元类奖项的玩家成为当前状元，后续**更大的替换、更小或完全相等的保持不变**（相等先到先得）
+- 同等级比较键：
+  - **状元插金花 / 六杯红 / 遍地锦** —— 唯一，先到先得
+  - **六勃黑** —— 比六同点数值（6 > 5 > 3 > 2）
+  - **五王** —— 比剩余一颗骰子点数
+  - **五子** —— 先比五同点点数，再比剩余一颗骰子
+  - **四红** —— 比剩余两骰的降序序列（如 `[6,5] > [6,3] > [5,5]`）
+
+### 结束与结算
+
+- 五个普通奖池全为 0，或掷满 **10 轮** → 游戏结束（状元池不参与「池空」判定）
+- 结束时当前状元获得状元奖品；状元为空则**状元空缺**，奖品不发
+
+---
+
+## 技术实现
+
+### 技术栈
+
+TypeScript 5 · React 18 · Vite 5 · Vitest 2 · 纯 CSS（无 UI 库 / CSS 框架）
+
+### 项目结构
+
+```
+minnan-bobing/
+├── index.html
+├── package.json / tsconfig.json / vite.config.ts / .npmrc
+├── LICENSE / README.md
+├── .github/workflows/ci.yml     # CI：类型检查 + 测试 + 构建
+├── public/                      # 静态资源预留目录
+├── docs/screenshots/            # 界面截图
+└── src/
+    ├── main.tsx                 # 挂载入口
+    ├── App.tsx                  # 三阶段编排：开始 → 游戏 → 结算
+    ├── styles.css               # 全部样式与动画
+    ├── sound.ts                 # WebAudio 音效引擎 + 开关偏好持久化
+    ├── assets/fonts/            # 本地化字体（站酷快乐体，SIL OFL）
+    ├── core/                    # ★ 纯逻辑层，零 UI 依赖
+    │   ├── types.ts             # 类型、奖项元数据、奖池常量
+    │   ├── rules.ts             # judgeRoll() 判定 + compareRolls() 比较
+    │   ├── random.ts            # 可注入随机源 + 测试用确定性随机源
+    │   ├── engine.ts            # 状态机：发奖 / 状元更替 / 轮次 / 结算
+    │   └── __tests__/
+    │       ├── rules.test.ts        # 判定表与比较器（37 项）
+    │       ├── engine.test.ts       # 状态机与不变量（27 项）
+    │       └── app.smoke.test.tsx   # 界面端到端冒烟（9 项）
+    └── components/
+        ├── StartScreen.tsx / GameScreen.tsx / EndScreen.tsx
+        ├── DiceBowl.tsx / Die.tsx           # 博饼碗与骰子
+        ├── PlayerList.tsx / PrizePool.tsx / HistoryLog.tsx
+        ├── SoundToggle.tsx
+        └── Decor.tsx                        # 中秋装饰 SVG（手绘内联）
+```
+
+### 分层约定
+
+**规则全部集中在 `src/core/`，UI 组件不含任何判定逻辑。** 组件只调用 `core` 暴露的接口；规则改动只需修改 `core` 并跑测试，UI 无需变动。
+
+### 核心 API
+
+```ts
+// 判定单次掷骰
+judgeRoll(dice: number[]): RollResult
+// RollResult = { prizeKey, prize, level, type: 'normal' | 'zhuangyuan' | 'none', tiebreak, desc }
+
+// 比较两次掷骰（用于状元更替）：> 0 表示 a 更大，0 表示完全相等
+compareRolls(a: RollResult, b: RollResult): number
+
+// 创建一局 / 执行一掷（返回新状态，不可变更新）
+createGame(names: string[], options?: { maxRounds?: number }): GameState
+rollOnce(state: GameState, random?: RandomFn): { state: GameState; outcome: RollOutcome }
+```
+
+随机源可注入，测试用 `diceSequenceRandom([[4, 4, 4, 4, 1, 1]])` 构造确定性骰子序列。
+
+---
+
+## 测试
+
+```bash
+npm test
+```
+
+共 **73 项**全部通过：
+
+| 测试文件 | 项数 | 覆盖内容 |
+| :--- | :---: | :--- |
+| `rules.test.ts` | 37 | 13 条指定用例（含 `六勃黑-6`、`四进-1`、`五子-5` 的比较键断言）与边界 `[2,2,2,2,2,2]`、`[6,6,6,6,6,5]`、`[4,4,4,4,1,2]`、`[1,1,1,1,2,2]`、对堂各种排列；比较器六勃黑 6>5>3>2、五王比余骰、五子两级比较、四红降序序列、唯一奖项相等返回 0、非法输入抛错 |
+| `engine.test.ts` | 27 | 普通奖先到先得与池空不顺延、状元成为 / 替换 / 相等不替换、10 轮结束与奖池全空提前结束、结算状元领奖或空缺、2 人与 12 人边界，以及 60 组确定性随机整局模拟的不变量校验（奖品不超上限、结论完备、状元至多 1 个） |
+| `app.smoke.test.tsx` | 9 | jsdom 下真实挂载渲染，走完「开始 → 掷骰 → 结算 → 重开」全流程，并断言全程无 React 运行时错误 |
+
+---
+
+## 离线与素材
+
+| 类别 | 方案 |
+| :--- | :--- |
+| 音效 | **WebAudio 程序化实时合成**（掷骰碰撞、中奖铃声、状元锣声、加冕音阶）。零音频文件、零网络请求，不存在授权问题 |
+| 字体 | 站酷快乐体 ZCOOL KuaiLe（**SIL OFL 免费商用**），已本地化到 `src/assets/fonts/`，随构建打包 |
+| 装饰 | 月亮、玉兔、红灯笼、桂花、月饼、云纹、皇冠、红花全部为**手绘内联 SVG**，无外部图片 |
+| 网络 | 运行期**零网络请求**，无 CDN 外链，断网可正常运行 |
+
+字体缺失或加载失败时自动回退到 `PingFang SC` / `Microsoft YaHei`，不会出现方块字。音效受浏览器自动播放策略限制，首次点击「开始博饼」时自动解锁音频。
+
+### 构建产物体积
+
+```
+dist/assets/index-*.js      179 KB（gzip  58 KB）
+dist/assets/index-*.css      30 KB（gzip   8 KB）
+dist/assets/*CJK*.woff2     726 KB   ← 标题字体，本地托管（为支持任意中文姓名未做极致子集化）
+```
+
+> **关于标题字体的数字**：站酷快乐体是手绘感艺术字，其数字（尤其 `0`、`6`）刻意做成几何折角造型，视觉上略带方块感，这是**字体本身的设计**而非渲染故障。若希望数字更规整，将 `src/styles.css` 中的 `--font-title` 改为只保留系统字体即可。
+
+---
+
+## 浏览器兼容
+
+| 浏览器 | 版本 |
+| :--- | :--- |
+| Chrome / Edge | ≥ 90 |
+| Safari | ≥ 14 |
+| Firefox | ≥ 90 |
+
+依赖 CSS `backdrop-filter`（毛玻璃卡片）与 Web Audio API；不支持时自动降级为纯色卡片与静音，不影响玩法。
+
+---
+
+## 贡献
+
+欢迎提交 Issue 与 Pull Request。
+
+1. Fork 本仓库并新建分支：`git checkout -b feat/your-feature`
+2. 保持 `src/core/` 的纯函数约定，规则相关改动请同步补充单元测试
+3. 提交前确保 `npm test` 与 `npm run build` 均通过
+4. 提交 PR 并说明改动动机
+
+> 本项目按题目要求**固定实现「厦门常见规则」**，不接受地方规则差异的可配置化改动，以免判定逻辑复杂化。
+
+---
+
+## 许可证
+
+本项目基于 [MIT License](./LICENSE) 开源。
+
+内置标题字体「站酷快乐体 ZCOOL KuaiLe」遵循 [SIL Open Font License 1.1](src/assets/fonts/LICENSE-ZCOOLKuaiLe.txt)，可免费商用，版权归原作者所有。
+
+<div align="center">
+
+**中秋快乐，博个好彩头 🎲🥮**
+
+</div>

@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/icon.png" width="104" alt="闽南中秋博饼" />
+
 # 闽南中秋博饼模拟器
 
 **六颗骰子一只碗，一家人围坐争状元。**

@@ -6,8 +6,11 @@
 
 一个纯单机离线的浏览器应用，完整实现「厦门常见规则」的博饼玩法。
 
+### [🎲 在线试玩 →](https://kenneth-g6.github.io/minnan-bobing/)
+
 [![License](https://img.shields.io/badge/license-MIT-2ea44f.svg)](./LICENSE)
 [![CI](https://github.com/Kenneth-G6/minnan-bobing/actions/workflows/ci.yml/badge.svg)](https://github.com/Kenneth-G6/minnan-bobing/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Kenneth-G6/minnan-bobing/actions/workflows/pages.yml/badge.svg)](https://github.com/Kenneth-G6/minnan-bobing/actions/workflows/pages.yml)
 ![React](https://img.shields.io/badge/React-18-61dafb.svg?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6.svg?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-5-646cff.svg?logo=vite&logoColor=white)
@@ -74,6 +77,12 @@ npm run dev
 | `npm run test:watch` | 监听模式运行测试 |
 
 构建后 `dist/` 为纯静态资源，可直接用任意静态服务器托管，或断网双击 `dist/index.html` 运行。
+
+### 在线访问
+
+应用已部署到 GitHub Pages：<https://kenneth-g6.github.io/minnan-bobing/>
+
+推送 `main` 分支后由 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) 自动完成构建与发布（类型检查 → 测试 → 构建 → 部署）。Fork 之后在自己的仓库 `Settings → Pages` 把 Source 设为 **GitHub Actions**，即可得到同样的站点。
 
 <details>
 <summary><b>关于 <code>.npmrc</code> 国内镜像</b></summary>

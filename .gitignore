@@ -46,3 +46,6 @@ _shots/
 *-preview.tsx
 *-probe.html
 *-probe.tsx
+
+# 本地统计实验脚本（一次性实验，不随仓库分发）
+scripts/

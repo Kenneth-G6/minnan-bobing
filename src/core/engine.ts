@@ -8,7 +8,6 @@ import { defaultRandom, rollDice, type RandomFn } from './random';
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
-  DEFAULT_MAX_ROUNDS,
   NORMAL_PRIZE_KEYS,
   PRIZE_META,
   createEmptyPrizeCount,
@@ -67,10 +66,8 @@ export interface GameState {
   pool: PrizePool;
   /** 当前行动玩家在 players 中的下标 */
   currentIndex: number;
-  /** 当前轮次（1 起） */
+  /** 当前轮次（1 起），仅用于记录与展示，不参与结束判定 */
   round: number;
-  /** 最大轮数 */
-  maxRounds: number;
   /** 当前状元 */
   zhuangyuan: { playerId: number; result: RollResult } | null;
   /** 掷骰历史（按时间顺序） */
@@ -79,11 +76,6 @@ export interface GameState {
   status: 'playing' | 'finished';
   /** 是否已完成结算发奖 */
   settled: boolean;
-}
-
-/** 创建游戏时的可选参数 */
-export interface CreateGameOptions {
-  maxRounds?: number;
 }
 
 /** 玩家奖品总数 */
@@ -100,9 +92,8 @@ export function isNormalPoolEmpty(pool: PrizePool): boolean {
  * 创建一局新游戏。
  *
  * @param names 玩家姓名列表，长度须在 2–12 之间
- * @param options.maxRounds 最大轮数，默认 10
  */
-export function createGame(names: string[], options: CreateGameOptions = {}): GameState {
+export function createGame(names: string[]): GameState {
   if (!Array.isArray(names) || names.length < MIN_PLAYERS || names.length > MAX_PLAYERS) {
     throw new Error(`玩家人数须在 ${MIN_PLAYERS}–${MAX_PLAYERS} 之间，收到 ${names?.length}`);
   }
@@ -121,7 +112,6 @@ export function createGame(names: string[], options: CreateGameOptions = {}): Ga
     pool: createInitialPool(),
     currentIndex: 0,
     round: 1,
-    maxRounds: options.maxRounds ?? DEFAULT_MAX_ROUNDS,
     zhuangyuan: null,
     history: [],
     status: 'playing',
@@ -231,8 +221,8 @@ export function rollOnce(
     round += 1;
   }
 
-  // 结束条件：普通奖奖池全空，或达到最大轮数（状元池不参与判定）
-  const finished = round > state.maxRounds || isNormalPoolEmpty(pool);
+  // 结束条件：五个普通奖池全空（状元池不参与判定）；轮数不设上限
+  const finished = isNormalPoolEmpty(pool);
 
   const next: GameState = {
     ...state,

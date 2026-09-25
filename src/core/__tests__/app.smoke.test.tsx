@@ -6,14 +6,19 @@
  *   1. 开始界面渲染（标题、默认玩家人数、姓名输入框）
  *   2. 调整人数后开始博饼，进入游戏界面（玩家高亮、奖池、掷骰按钮）
  *   3. 掷骰 → 动画结束 → 结果与历史记录写入
- *   4. 一直博到结束 → 结算界面正常渲染
- *   5. 全流程不产生 React 运行时错误
+ *   4. 轮次只累加不封顶
+ *   5. 一直博到普通奖发完 → 结算界面正常渲染
+ *   6. 全流程不产生 React 运行时错误
+ *
+ * 结束条件只剩「普通奖全部发完」后，靠真随机掷骰无法在有限步内稳定结束，
+ * 因此注入确定性骰子序列：第 1 掷博出状元插金花，其后 62 掷恰好清空五个普通奖池。
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App';
+import type { RandomFn } from '../random';
+import { diceSequenceRandom } from '../random';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -21,6 +26,35 @@ let errorSpy: ReturnType<typeof vi.spyOn>;
 
 /** 掷骰动画时长 + 余量 */
 const ROLL_TICKS = 1500;
+
+// ── 确定性骰子序列 ────────────────────────────────────────────
+const NO_PRIZE = [2, 2, 3, 3, 5, 6]; // 无奖
+const CHAJINHUA = [4, 4, 4, 4, 1, 1]; // 状元插金花（不消耗普通奖池）
+const YIXIU = [4, 1, 2, 3, 5, 5]; // 一秀 ×1（刻意避开「六点全不同」的对堂形态）
+const ERJU = [4, 4, 1, 2, 3, 5]; // 二举 ×2
+const SANHONG = [4, 4, 4, 1, 2, 3]; // 三红 ×3
+const DUITANG = [1, 2, 3, 4, 5, 6]; // 对堂 ×1
+const SIJIN = [1, 1, 1, 1, 2, 3]; // 四进 ×4
+
+/** 从空池开始、发满全部普通奖所需的总掷骰数（1 + 32 + 16 + 4 + 2 + 8） */
+const FULL_GAME_ROLLS = 63;
+
+/**
+ * 构造「必然把五个普通奖池发空」的骰子序列：
+ * 插金花抢先占状元位，随后按奖池数量依次发完一秀 / 二举 / 三红 / 对堂 / 四进。
+ * 尾部补几掷无奖作为余量，防止断言漂移时序列耗尽抛错。
+ */
+function winningSequence(): number[][] {
+  return [
+    CHAJINHUA,
+    ...Array.from({ length: 32 }, () => YIXIU),
+    ...Array.from({ length: 16 }, () => ERJU),
+    ...Array.from({ length: 4 }, () => SANHONG),
+    ...Array.from({ length: 2 }, () => DUITANG),
+    ...Array.from({ length: 8 }, () => SIJIN),
+    ...Array.from({ length: 5 }, () => NO_PRIZE),
+  ];
+}
 
 beforeEach(() => {
   (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -38,10 +72,23 @@ afterEach(() => {
   errorSpy.mockRestore();
 });
 
-function renderApp() {
+function renderApp(random?: RandomFn) {
   act(() => {
-    root.render(createElement(App));
+    root.render(random ? <App random={random} /> : <App />);
   });
+}
+
+/** 一路点「掷骰子」直到进入结算界面，返回实际掷骰次数 */
+function rollUntilEnd(limit = FULL_GAME_ROLLS + 10): number {
+  let rolls = 0;
+  while (rolls < limit && !container.querySelector('.screen--end')) {
+    const button = container.querySelector<HTMLButtonElement>('.btn--roll');
+    if (!button || button.disabled) break;
+    click('.btn--roll');
+    tick(ROLL_TICKS + 3200); // 覆盖动画 + 自动跳转结算的延迟
+    rolls += 1;
+  }
+  return rolls;
 }
 
 function text(): string {
@@ -149,50 +196,55 @@ describe('应用整体流程', () => {
     expect(container.querySelector('.next-turn')?.textContent).toContain('玩家2');
   });
 
-  it('连续掷骰会把记录累积到历史，并在结束后进入结算界面', () => {
+  it('轮次只累加不封顶：走完一圈即进入第 2 轮，徽章不再显示上限', () => {
     renderApp();
-    click('.start-card__start');
+    click('.start-card__start'); // 默认 6 人
 
-    // 6 位玩家 × 10 轮 = 最多 60 掷；奖池发完会更早结束
-    let rolls = 0;
-    while (container.querySelector('.btn--roll') && rolls < 70) {
-      const button = container.querySelector<HTMLButtonElement>('.btn--roll');
-      if (button?.disabled) break;
+    const badge = () => container.querySelector('.round-badge')?.textContent ?? '';
+    expect(badge()).toContain('第');
+    expect(badge()).toContain('1');
+
+    // 6 人各掷一次 → 走完第 1 圈
+    for (let i = 0; i < 6; i += 1) {
       click('.btn--roll');
-      tick(ROLL_TICKS + 3200); // 覆盖动画 + 自动跳转结算的延迟
-      rolls += 1;
-      if (container.querySelector('.screen--end')) break;
+      tick(ROLL_TICKS);
     }
 
-    expect(rolls).toBeGreaterThan(0);
+    expect(badge()).toContain('2');
+    expect(badge()).not.toContain('/');
+    // 62 份普通奖不可能 6 掷发完，游戏必定仍在进行
+    expect(container.querySelector('.screen--game')).not.toBeNull();
+    expect(container.querySelectorAll('.history__row')).toHaveLength(6);
+  });
+
+  it('连续掷骰会把记录累积到历史，并在普通奖发完后进入结算界面', () => {
+    renderApp(diceSequenceRandom(winningSequence()));
+    click('.start-card__start');
+
+    const rolls = rollUntilEnd();
+
+    expect(rolls).toBe(FULL_GAME_ROLLS);
     expect(container.querySelector('.screen--end'), '应进入结算界面').not.toBeNull();
 
     const endText = text();
     expect(endText).toContain('团圆战果');
-    // 必然结束：要么掷满 10 轮，要么普通奖发完
-    expect(endText.includes('掷满 10 轮') || endText.includes('普通奖全部博完')).toBe(true);
+    // 唯一结束条件：普通奖全部发完（不再有「掷满 10 轮」）
+    expect(endText).toContain('普通奖全部博完');
+    expect(endText).not.toContain('掷满');
     // 每位玩家都有战果卡片
     expect(container.querySelectorAll('.tally-card')).toHaveLength(6);
-    // 状元要么加冕，要么明确显示空缺
-    expect(
-      endText.includes('状元空缺') || container.querySelector('.crowning__crown') !== null,
-    ).toBe(true);
+    // 首掷即博出状元插金花 → 必然加冕而非空缺
+    expect(container.querySelector('.crowning__crown')).not.toBeNull();
+    expect(endText).toContain('状元插金花');
     // 重新开始按钮存在
     expect(container.querySelector('.end-actions')).not.toBeNull();
   });
 
   it('可以从结算界面重新开始回到开始界面', () => {
-    renderApp();
+    renderApp(diceSequenceRandom(winningSequence()));
     click('.start-card__start');
 
-    let rolls = 0;
-    while (rolls < 70 && !container.querySelector('.screen--end')) {
-      const button = container.querySelector<HTMLButtonElement>('.btn--roll');
-      if (!button || button.disabled) break;
-      click('.btn--roll');
-      tick(ROLL_TICKS + 3200);
-      rolls += 1;
-    }
+    expect(rollUntilEnd()).toBe(FULL_GAME_ROLLS);
     expect(container.querySelector('.screen--end')).not.toBeNull();
 
     const restart = Array.from(container.querySelectorAll('button')).find(

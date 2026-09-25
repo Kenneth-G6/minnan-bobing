@@ -195,7 +195,7 @@ export function StartScreen({ soundEnabled, onToggleSound, onStart }: StartScree
 
             <p className="rules-panel__note">
               普通奖先到先得，发完即「该奖项已满，无奖」，不向下顺延。状元类奖项更大者替换当前状元，
-              完全相等先到先得。普通奖发完或掷满 10 轮即结束，当前状元获得状元奖品。
+              完全相等先到先得。五个普通奖全部博完即结束，当前状元获得状元奖品。
             </p>
           </div>
         )}

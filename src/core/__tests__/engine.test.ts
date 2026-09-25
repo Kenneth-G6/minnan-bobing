@@ -67,7 +67,6 @@ describe('createGame —— 初始化', () => {
       zhuangyuan: 1,
     });
     expect(g.round).toBe(1);
-    expect(g.maxRounds).toBe(10);
     expect(g.currentIndex).toBe(0);
     expect(g.zhuangyuan).toBeNull();
     expect(g.history).toEqual([]);
@@ -88,10 +87,6 @@ describe('createGame —— 初始化', () => {
     expect(g.players[0].name).toBe('阿明');
     expect(g.players[1].name).toBe('玩家2');
     expect(g.players[2].name).toBe('玩家3');
-  });
-
-  it('可自定义最大轮数', () => {
-    expect(createGame(['A', 'B'], { maxRounds: 3 }).maxRounds).toBe(3);
   });
 });
 
@@ -243,24 +238,21 @@ describe('轮次与玩家顺序', () => {
 });
 
 describe('结束条件与结算', () => {
-  it('掷满 10 轮结束（2 人 = 20 掷）', () => {
+  it('不设轮数上限：连续 30 轮无奖也绝不结束', () => {
     const g = createGame(['A', 'B']);
-    const rolls = Array.from({ length: 20 }, () => NO_PRIZE);
+    const rolls = Array.from({ length: 60 }, () => NO_PRIZE); // 2 人 × 30 轮
 
-    const partial = play(g, rolls.slice(0, 19));
-    expect(partial.state.status).toBe('playing');
-    expect(partial.state.round).toBe(10);
+    const { state, outcomes } = play(g, rolls);
 
-    // 第 20 掷走完第 10 轮 → 结束
-    const random = diceSequenceRandom([NO_PRIZE]);
-    const { state, outcome } = rollOnce(partial.state, random);
-    expect(outcome.round).toBe(10);
-    expect(state.round).toBe(11);
-    expect(state.status).toBe('finished');
-    expect(state.settled).toBe(true);
+    expect(outcomes[59].round).toBe(30);
+    expect(state.round).toBe(31);
+    expect(state.status).toBe('playing');
+    expect(state.settled).toBe(false);
+    // 普通奖池仍有存货，轮次推得再远也不触发结束
+    expect(isNormalPoolEmpty(state.pool)).toBe(false);
   });
 
-  it('普通奖池全空时提前结束（不必掷满 10 轮）', () => {
+  it('普通奖池全空是唯一的结束条件', () => {
     let g = createGame(['A', 'B', 'C', 'D']);
     g = onlyNormal(g, 'duitang', 1);
     expect(isNormalPoolEmpty(g.pool)).toBe(false);
@@ -357,11 +349,12 @@ describe('整局随机模拟（不变量校验）', () => {
       while (state.status === 'playing') {
         state = rollOnce(state, random).state;
         guard += 1;
-        expect(guard).toBeLessThanOrEqual(playerCount * state.maxRounds + 1);
+        // 安全阀：最慢的奖池（四进 8 个 ≈ 200 掷）期望远小于此，超出即说明结束逻辑有问题
+        expect(guard).toBeLessThanOrEqual(5000);
       }
 
-      // 每轮每人最多一掷 → 总掷骰数不超过 人数 × 最大轮数
-      expect(state.history.length).toBeLessThanOrEqual(playerCount * state.maxRounds);
+      // 不设轮数上限 → 唯一的结束理由只能是普通奖全部发完
+      expect(isNormalPoolEmpty(state.pool)).toBe(true);
 
       // 各普通奖发放总数不超过初始数量
       for (const key of NORMAL_PRIZE_KEYS) {

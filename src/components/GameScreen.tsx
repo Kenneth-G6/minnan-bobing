@@ -10,6 +10,7 @@ import {
   type RollOutcome,
 } from '../core/engine';
 import { PRIZE_META, NORMAL_PRIZE_KEYS, DICE_COUNT, type PrizeKey } from '../core/types';
+import type { RandomFn } from '../core/random';
 import { sound } from '../sound';
 import { Crown, Sparkle } from './Decor';
 import { DiceBowl } from './DiceBowl';
@@ -49,6 +50,8 @@ export interface GameScreenProps {
   onExit: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  /** 可选随机源（测试注入确定性骰子序列），不传即为真随机 */
+  random?: RandomFn;
 }
 
 export function GameScreen({
@@ -58,6 +61,7 @@ export function GameScreen({
   onExit,
   soundEnabled,
   onToggleSound,
+  random,
 }: GameScreenProps) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [displayDice, setDisplayDice] = useState<number[]>(() => randomFaces());
@@ -101,7 +105,7 @@ export function GameScreen({
     sound.play('roll');
 
     // 先按规则算出结果，动画结束后再揭晓
-    const { state: next, outcome: result } = rollOnce(state);
+    const { state: next, outcome: result } = rollOnce(state, random);
 
     setPhase('rolling');
     setOutcome(null);
@@ -186,7 +190,7 @@ export function GameScreen({
       <header className="game-header glass">
         <div className="game-header__left">
           <span className="round-badge">
-            第 <b>{Math.min(state.round, state.maxRounds)}</b> / {state.maxRounds} 轮
+            第 <b>{state.round}</b> 轮
           </span>
           <span className="round-meta">
             还剩 {remainingNormal} 份普通奖 · 共 {state.players.length} 位玩家

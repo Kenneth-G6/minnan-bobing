@@ -79,9 +79,6 @@ export const DEFAULT_PLAYER_COUNT = 6;
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 12;
 
-/** 默认最大轮数 */
-export const DEFAULT_MAX_ROUNDS = 10;
-
 /** 初始奖池（深拷贝，避免共享引用） */
 export function createInitialPool(): Record<PrizeKey, number> {
   return {

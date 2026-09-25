@@ -7,9 +7,15 @@ import { EndScreen } from './components/EndScreen';
 import { GameScreen } from './components/GameScreen';
 import { Osmanthus } from './components/Decor';
 import { StartScreen } from './components/StartScreen';
+import type { RandomFn } from './core/random';
 import { loadSoundPreference, saveSoundPreference, sound } from './sound';
 
 type Stage = 'start' | 'playing' | 'end';
+
+/** 可选随机源，仅用于测试注入确定性骰子序列；不传即真随机 */
+export interface AppProps {
+  random?: RandomFn;
+}
 
 /** 背景桂花飘落的位置（固定数组，避免每次渲染重新随机） */
 const OSMANTHUS = [
@@ -27,7 +33,7 @@ const OSMANTHUS = [
   { left: '93%', delay: 6.7, duration: 20, size: 12 },
 ];
 
-export default function App() {
+export default function App({ random }: AppProps = {}) {
   const [stage, setStage] = useState<Stage>('start');
   const [game, setGame] = useState<GameState | null>(null);
   const [playedNames, setPlayedNames] = useState<string[]>([]);
@@ -128,6 +134,7 @@ export default function App() {
           onExit={handleExit}
           soundEnabled={soundEnabled}
           onToggleSound={toggleSound}
+          random={random}
         />
       )}
 

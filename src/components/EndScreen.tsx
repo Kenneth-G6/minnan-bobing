@@ -38,11 +38,7 @@ export function EndScreen({ state, onRestart, onPlayAgain, soundEnabled, onToggl
     return countPrizes(b) - countPrizes(a);
   });
 
-  const reason = state.history.length === 0
-    ? ''
-    : state.round > state.maxRounds
-      ? `掷满 ${state.maxRounds} 轮`
-      : '普通奖全部博完';
+  const reason = state.history.length === 0 ? '' : '普通奖全部博完';
 
   return (
     <div className="screen screen--end">

@@ -1,7 +1,7 @@
 {
   "name": "minnan-bobing",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "闽南中秋博饼模拟器 —— 纯单机离线浏览器应用",
   "scripts": {

@@ -180,8 +180,11 @@ npm install --registry=https://registry.npmjs.org
 
 ### 结束与结算
 
-- 五个普通奖池全为 0，或掷满 **10 轮** → 游戏结束（状元池不参与「池空」判定）
+- 五个普通奖池全为 0 → 游戏结束（状元池不参与「池空」判定）
+- **轮数不设上限**，一局会一直博到五个普通奖发完为止；顶栏轮次仅用于展示进度
 - 结束时当前状元获得状元奖品；状元为空则**状元空缺**，奖品不发
+
+> 因为不限轮数，终局通常由最稀缺的奖池决定（6 人一局约 20–35 轮），中途一秀 / 二举 / 三红发完后会出现「已满，无奖」的空掷，属预期表现。
 
 ---
 
@@ -214,8 +217,8 @@ minnan-bobing/
     │   ├── engine.ts            # 状态机：发奖 / 状元更替 / 轮次 / 结算
     │   └── __tests__/
     │       ├── rules.test.ts        # 判定表与比较器（37 项）
-    │       ├── engine.test.ts       # 状态机与不变量（27 项）
-    │       └── app.smoke.test.tsx   # 界面端到端冒烟（9 项）
+    │       ├── engine.test.ts       # 状态机与不变量（26 项）
+    │       └── app.smoke.test.tsx   # 界面端到端冒烟（10 项）
     └── components/
         ├── StartScreen.tsx / GameScreen.tsx / EndScreen.tsx
         ├── DiceBowl.tsx / Die.tsx           # 博饼碗与骰子
@@ -239,7 +242,7 @@ judgeRoll(dice: number[]): RollResult
 compareRolls(a: RollResult, b: RollResult): number
 
 // 创建一局 / 执行一掷（返回新状态，不可变更新）
-createGame(names: string[], options?: { maxRounds?: number }): GameState
+createGame(names: string[]): GameState
 rollOnce(state: GameState, random?: RandomFn): { state: GameState; outcome: RollOutcome }
 ```
 
@@ -258,8 +261,8 @@ npm test
 | 测试文件 | 覆盖内容 |
 | :--- | :--- |
 | `rules.test.ts`（37 项） | 13 条指定用例（含 `六勃黑-6`、`四进-1`、`五子-5` 的比较键断言）与边界 `[2,2,2,2,2,2]`、`[6,6,6,6,6,5]`、`[4,4,4,4,1,2]`、`[1,1,1,1,2,2]`、对堂各种排列；比较器六勃黑 6>5>3>2、五王比余骰、五子两级比较、四红降序序列、唯一奖项相等返回 0、非法输入抛错 |
-| `engine.test.ts`（27 项） | 普通奖先到先得与池空不顺延、状元成为 / 替换 / 相等不替换、10 轮结束与奖池全空提前结束、结算状元领奖或空缺、2 人与 12 人边界，以及 60 组确定性随机整局模拟的不变量校验（奖品不超上限、结论完备、状元至多 1 个） |
-| `app.smoke.test.tsx`（9 项） | jsdom 下真实挂载渲染，走完「开始 → 掷骰 → 结算 → 重开」全流程，并断言全程无 React 运行时错误 |
+| `engine.test.ts`（26 项） | 普通奖先到先得与池空不顺延、状元成为 / 替换 / 相等不替换、**不设轮数上限**（连续 30 轮无奖仍不结束）与「普通奖池全空是唯一结束条件」、结算状元领奖或空缺、2 人与 12 人边界，以及 60 组确定性随机整局模拟的不变量校验（结束后普通奖池必为空、奖品不超上限、结论完备、状元至多 1 个） |
+| `app.smoke.test.tsx`（10 项） | jsdom 下真实挂载渲染，走完「开始 → 掷骰 → 结算 → 重开」全流程；结束条件收窄后改为注入确定性骰子序列（第 1 掷插金花，其后 62 掷恰好清空五个普通奖池），并断言轮次只累加不封顶、全程无 React 运行时错误 |
 
 ---
 

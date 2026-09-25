@@ -8,10 +8,12 @@
  *   3. 掷骰 → 动画结束 → 结果与历史记录写入
  *   4. 轮次只累加不封顶
  *   5. 一直博到普通奖发完 → 结算界面正常渲染
- *   6. 全流程不产生 React 运行时错误
+ *   6. 状元争：模式选择、规则速览切换、连掷演出、擂主收官全流程
+ *   7. 全流程不产生 React 运行时错误
  *
- * 结束条件只剩「普通奖全部发完」后，靠真随机掷骰无法在有限步内稳定结束，
+ * 经典模式结束条件只剩「普通奖全部发完」后，靠真随机掷骰无法在有限步内稳定结束，
  * 因此注入确定性骰子序列：第 1 掷博出状元插金花，其后 62 掷恰好清空五个普通奖池。
+ * 状元争同理 —— 每回合平均要连掷 83 次才博中，也必须注入确定性序列。
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -26,6 +28,8 @@ let errorSpy: ReturnType<typeof vi.spyOn>;
 
 /** 掷骰动画时长 + 余量 */
 const ROLL_TICKS = 1500;
+/** 状元争一个完整回合（过程演出 + 命中定格 + 可能的结算跳转）的推进量 */
+const TURN_TICKS = 8000;
 
 // ── 确定性骰子序列 ────────────────────────────────────────────
 const NO_PRIZE = [2, 2, 3, 3, 5, 6]; // 无奖
@@ -35,6 +39,8 @@ const ERJU = [4, 4, 1, 2, 3, 5]; // 二举 ×2
 const SANHONG = [4, 4, 4, 1, 2, 3]; // 三红 ×3
 const DUITANG = [1, 2, 3, 4, 5, 6]; // 对堂 ×1
 const SIJIN = [1, 1, 1, 1, 2, 3]; // 四进 ×4
+const DUEL_WUZI = [5, 5, 5, 5, 5, 2]; // 五子（状元类 7）
+const DUEL_SIHONG = [4, 4, 4, 4, 2, 1]; // 四红（状元类 6）
 
 /** 从空池开始、发满全部普通奖所需的总掷骰数（1 + 32 + 16 + 4 + 2 + 8） */
 const FULL_GAME_ROLLS = 63;
@@ -53,6 +59,25 @@ function winningSequence(): number[][] {
     ...Array.from({ length: 2 }, () => DUITANG),
     ...Array.from({ length: 8 }, () => SIJIN),
     ...Array.from({ length: 5 }, () => NO_PRIZE),
+  ];
+}
+
+/**
+ * 状元争 4 人局：恰好 4 个回合收官。
+ *   回合 1（玩家1）连掷 2 次博出五子 → 成为擂主
+ *   回合 2（玩家2）连掷 3 次博出四红 → 未超过
+ *   回合 3（玩家3）一击即中四红   → 未超过
+ *   回合 4（玩家4）一击即中四红   → 未超过 → 本圈无人抢位，收官
+ */
+function duelSequence(): number[][] {
+  return [
+    NO_PRIZE,
+    DUEL_WUZI,
+    NO_PRIZE,
+    NO_PRIZE,
+    DUEL_SIHONG,
+    DUEL_SIHONG,
+    DUEL_SIHONG,
   ];
 }
 
@@ -109,6 +134,40 @@ function tick(ms: number) {
   act(() => {
     vi.advanceTimersByTime(ms);
   });
+}
+
+/** 在开始界面选中指定玩法模式 */
+function pickMode(label: string) {
+  const card = Array.from(container.querySelectorAll('.mode-card')).find((b) =>
+    (b.textContent ?? '').includes(label),
+  );
+  expect(card, `找不到模式卡片 ${label}`).not.toBeNull();
+  act(() => {
+    card!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
+
+/** 把玩家人数调整到指定值（默认 6 人） */
+function setCountTo(target: number) {
+  const value = () => Number(container.querySelector('.count-control__value b')?.textContent ?? '0');
+  const [minus, plus] = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('.count-control .btn--round'),
+  );
+  let guard = 0;
+  while (value() !== target && guard < 20) {
+    const button = value() > target ? minus : plus;
+    act(() => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    guard += 1;
+  }
+  expect(value(), '玩家人数调整失败').toBe(target);
+}
+
+/** 交一次「博一次」，把过程演出与命中定格全部推进完 */
+function playDuelTurn() {
+  click('.btn--roll');
+  tick(TURN_TICKS);
 }
 
 describe('应用整体流程', () => {
@@ -295,6 +354,111 @@ describe('应用整体流程', () => {
     });
     expect(container.querySelector('.modal')).toBeNull();
     expect(container.querySelector('.screen--game')).not.toBeNull();
+  });
+
+  it('状元争：开始界面可切换玩法，规则速览随之切换', () => {
+    renderApp();
+
+    // 默认经典：规则速览列出全部 12 级奖项
+    click('.rules-toggle');
+    expect(container.querySelectorAll('.rules-table li')).toHaveLength(12);
+
+    pickMode('状元争');
+    expect(container.querySelector('.mode-card.is-active')?.textContent).toContain('状元争');
+
+    // 状元争：只剩 7 级判定，且带命中率
+    const labels = Array.from(
+      container.querySelectorAll('.rules-table--duel .rules-table__label'),
+    ).map((el) => el.textContent);
+    expect(labels).toEqual(['状元插金花', '六杯红', '遍地锦', '六勃黑', '五王', '五子', '四红']);
+    expect(container.querySelector('.rules-panel')?.textContent).toContain('1.2024%');
+
+    // 切回经典，回归 12 级
+    pickMode('经典博饼');
+    expect(container.querySelectorAll('.rules-table--duel')).toHaveLength(0);
+    expect(container.querySelectorAll('.rules-table li')).toHaveLength(12);
+  });
+
+  it('状元争：注入确定性序列跑完整局，结算出现擂主与最佳成绩榜', () => {
+    renderApp(diceSequenceRandom(duelSequence()));
+    pickMode('状元争');
+    setCountTo(4);
+    click('.start-card__start');
+
+    // 游戏界面：模式徽章、擂主榜取代奖池、按钮为「博一次」
+    const badge = container.querySelector('.round-badge')?.textContent ?? '';
+    expect(badge).toContain('状元争');
+    expect(badge).not.toContain('轮');
+    expect(container.querySelector('.leaderboard')).not.toBeNull();
+    expect(container.querySelector('.prize-pool')).toBeNull();
+    expect(container.querySelector('.btn--roll')?.textContent).toContain('博一次');
+    expect(container.querySelector('.speed-control')).not.toBeNull();
+    expect(text()).toContain('本圈还剩 4 人待博');
+    // 开局无历史，擂主席虚位以待
+    expect(text()).toContain('擂主虚位以待');
+
+    // 回合 1：玩家1 连掷 2 次博出五子 → 成为擂主
+    playDuelTurn();
+    expect(container.querySelector('.result-panel__prize')?.textContent).toContain('五子');
+    expect(text()).toContain('坐上擂主位');
+    expect(container.querySelector('.next-turn')?.textContent).toContain('玩家2');
+    expect(container.querySelectorAll('.history__row')).toHaveLength(1);
+    expect(container.querySelector('.history__row')?.textContent).toContain('连掷 2 次');
+    expect(container.querySelector('.history__row')?.textContent).toContain('成为擂主');
+    expect(container.querySelector('.leader-row.is-zhuangyuan')?.textContent).toContain('守擂中');
+    expect(text()).toContain('本圈还剩 3 人待博');
+
+    // 剩下三个回合全部未超过擂主 → 本圈无人抢位，收官
+    playDuelTurn();
+    expect(container.querySelector('.history__row')?.textContent).toContain('未超过擂主');
+    playDuelTurn();
+    playDuelTurn();
+
+    expect(container.querySelector('.screen--end'), '应进入结算界面').not.toBeNull();
+    const endText = text();
+    expect(endText).toContain('本轮擂主 · 加冕');
+    expect(endText).toContain('本圈无人抢位，状元定格');
+    expect(endText).toContain('玩家1');
+    expect(endText).toContain('五子');
+    // 四位玩家都有战果卡片，且累计连掷数反查得到
+    expect(container.querySelectorAll('.tally-card')).toHaveLength(4);
+    expect(container.querySelectorAll('.tally-card.is-zhuangyuan')).toHaveLength(1);
+    expect(endText).toContain('累计连掷 2 次');
+    expect(container.querySelector('.end-actions')).not.toBeNull();
+  });
+
+  it('状元争：过程阶段显示连掷计数，可切到「直接看结果」', () => {
+    renderApp(diceSequenceRandom(duelSequence()));
+    pickMode('状元争');
+    setCountTo(4);
+    click('.start-card__start');
+
+    // 默认 ×1：点下「博一次」先进入过程阶段，计数条出现
+    expect(container.querySelector('.speed-control__btn.is-active')?.textContent).toBe('×1');
+    click('.btn--roll');
+    tick(20);
+    expect(container.querySelector('.reroll-counter')).not.toBeNull();
+    expect(text()).toContain('连掷中');
+    tick(TURN_TICKS);
+    expect(text()).toContain('坐上擂主位');
+
+    // 切到「直接看结果」：之后每回合不播过程阶段
+    const instant = Array.from(container.querySelectorAll('.speed-control__btn')).find(
+      (b) => b.textContent === '直接看结果',
+    );
+    expect(instant).toBeTruthy();
+    act(() => {
+      instant!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(container.querySelector('.speed-control__btn.is-active')?.textContent).toBe('直接看结果');
+
+    playDuelTurn();
+    expect(container.querySelector('.reroll-counter')).toBeNull();
+    expect(container.querySelector('.history__row')?.textContent).toContain('未超过擂主');
+    playDuelTurn();
+    playDuelTurn();
+
+    expect(container.querySelector('.screen--end')).not.toBeNull();
   });
 
   it('全流程未产生 React 运行时错误', () => {

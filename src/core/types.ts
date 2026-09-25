@@ -66,6 +66,56 @@ export const PRIZE_META: Record<
   zhuangyuan: { name: '状元', level: 12, count: 1, desc: '状元类奖项中最高者', type: 'zhuangyuan' },
 };
 
+/* ============================================================
+   玩法模式
+   ============================================================ */
+
+/**
+ * 玩法模式。
+ *   - classic     经典博饼：博全套奖品，五个普通奖发完收官
+ *   - zhuangyuan  状元争：只争状元，每个回合连掷到博出状元类为止，
+ *                 一圈之内无人超越当前擂主即收官
+ */
+export type GameMode = 'classic' | 'zhuangyuan';
+
+/** 模式元数据（界面展示用） */
+export const MODE_META: Record<GameMode, { name: string; tagline: string }> = {
+  classic: {
+    name: '经典博饼',
+    tagline: '博全套奖品，五个普通奖发完收官',
+  },
+  zhuangyuan: {
+    name: '状元争',
+    tagline: '只争状元，一圈无人超越即夺冠',
+  },
+};
+
+/** 状元争认可的最低等级 —— 四红及以上 7 级 */
+export const DUEL_MIN_LEVEL = ZHUANGYUAN_MIN_LEVEL;
+
+/**
+ * 状元争认可的 7 级奖项（由高到低）。
+ * 组合数由穷举 6⁶ = 46656 组精确算得，合计 561 组 / 1.2024%，仅用于界面展示。
+ */
+export const ZHUANGYUAN_TIERS: ReadonlyArray<{
+  level: number;
+  name: string;
+  combo: string;
+  combos: number;
+  rate: string;
+}> = [
+  { level: 12, name: '状元插金花', combo: '4 个 4 + 2 个 1', combos: 15, rate: '0.0321%' },
+  { level: 11, name: '六杯红', combo: '6 个 4', combos: 1, rate: '0.0021%' },
+  { level: 10, name: '遍地锦', combo: '6 个 1', combos: 1, rate: '0.0021%' },
+  { level: 9, name: '六勃黑', combo: '6 个 2 / 3 / 5 / 6', combos: 4, rate: '0.0086%' },
+  { level: 8, name: '五王', combo: '5 个 4', combos: 30, rate: '0.0643%' },
+  { level: 7, name: '五子', combo: '5 个同点（非 4）', combos: 150, rate: '0.3215%' },
+  { level: 6, name: '四红', combo: '4 个 4', combos: 360, rate: '0.7716%' },
+];
+
+/** 状元争的合计命中率（7 级 / 6⁶） */
+export const DUEL_HIT_RATE = '1.2024%';
+
 /** 骰子数量 */
 export const DICE_COUNT = 6;
 

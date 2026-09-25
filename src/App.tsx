@@ -2,7 +2,8 @@
  * 闽南中秋博饼模拟器 —— 应用入口，负责三阶段（开始 / 游戏 / 结算）编排
  */
 import { useCallback, useEffect, useState } from 'react';
-import { createGame, type GameState, type RollOutcome } from './core/engine';
+import { createGame, type GameState, type RollOutcome, type TurnOutcome } from './core/engine';
+import type { GameMode } from './core/types';
 import { EndScreen } from './components/EndScreen';
 import { GameScreen } from './components/GameScreen';
 import { Osmanthus } from './components/Decor';
@@ -58,16 +59,16 @@ export default function App({ random }: AppProps = {}) {
   }, []);
 
   /** 开始界面 → 游戏界面 */
-  const handleStart = useCallback((names: string[]) => {
+  const handleStart = useCallback((names: string[], mode: GameMode) => {
     sound.unlock();
     sound.play('click');
     setPlayedNames(names);
-    setGame(createGame(names));
+    setGame(createGame(names, mode));
     setStage('playing');
   }, []);
 
-  /** 掷骰动画结束后提交状态 */
-  const handleCommit = useCallback((next: GameState, _outcome: RollOutcome) => {
+  /** 掷骰动画结束后提交状态（经典模式为单掷，状元争为一个完整回合） */
+  const handleCommit = useCallback((next: GameState, _outcome: RollOutcome | TurnOutcome) => {
     setGame(next);
   }, []);
 
@@ -90,12 +91,12 @@ export default function App({ random }: AppProps = {}) {
     setStage('start');
   }, []);
 
-  /** 结算 → 沿用相同玩家再来一局 */
+  /** 结算 → 沿用相同玩家与玩法再来一局 */
   const handlePlayAgain = useCallback(() => {
     const names = playedNames.length > 0 ? playedNames : (game?.players.map((p) => p.name) ?? []);
     sound.unlock();
     sound.play('click');
-    setGame(createGame(names));
+    setGame(createGame(names, game?.mode ?? 'classic'));
     setStage('playing');
   }, [playedNames, game]);
 

@@ -1,7 +1,11 @@
 /**
- * 结算界面 —— 团圆喜庆，逐位玩家的奖品清单与状元加冕
+ * 结算界面 —— 团圆喜庆，逐位玩家的战果清单与状元 / 擂主加冕
+ *
+ * 经典模式：按奖品数排行，状元加冕；
+ * 状元争：按本局最佳成绩排行，擂主加冕，其余人展示个人最好成绩。
  */
-import { countPrizes, summarizePrizes, type GameState } from '../core/engine';
+import { countPrizes, summarizePrizes, type GameState, type Player } from '../core/engine';
+import { compareRolls } from '../core/rules';
 import { PRIZE_META } from '../core/types';
 import { Crown, Mooncake, RedFlower, Sparkle } from './Decor';
 import { SoundToggle } from './SoundToggle';
@@ -27,18 +31,40 @@ const GOLD_DUST = [
   { x: '82%', y: '52%', size: 16, delay: 340 },
 ];
 
-export function EndScreen({ state, onRestart, onPlayAgain, soundEnabled, onToggleSound }: EndScreenProps) {
-  const zyId = state.zhuangyuan?.playerId ?? null;
-  const zyPlayer = zyId === null ? null : (state.players.find((p) => p.id === zyId) ?? null);
-
-  // 状元优先，其次按奖品总数排序
-  const ranked = [...state.players].sort((a, b) => {
+/** 经典模式：状元优先，其次按奖品总数排序 */
+function rankClassic(players: Player[], zyId: number | null): Player[] {
+  return [...players].sort((a, b) => {
     if (a.id === zyId) return -1;
     if (b.id === zyId) return 1;
     return countPrizes(b) - countPrizes(a);
   });
+}
 
-  const reason = state.history.length === 0 ? '' : '普通奖全部博完';
+/** 状元争：按本局最佳成绩排序（擂主必然就是全场最高） */
+function rankDuel(players: Player[], zyId: number | null): Player[] {
+  return [...players].sort((a, b) => {
+    if (a.id === zyId) return -1;
+    if (b.id === zyId) return 1;
+    if (a.best && b.best) return compareRolls(b.best, a.best);
+    if (a.best) return -1;
+    if (b.best) return 1;
+    return a.id - b.id;
+  });
+}
+
+export function EndScreen({ state, onRestart, onPlayAgain, soundEnabled, onToggleSound }: EndScreenProps) {
+  const isDuel = state.mode === 'zhuangyuan';
+  const zyId = state.zhuangyuan?.playerId ?? null;
+  const zyPlayer = zyId === null ? null : (state.players.find((p) => p.id === zyId) ?? null);
+
+  const ranked = isDuel ? rankDuel(state.players, zyId) : rankClassic(state.players, zyId);
+
+  const reason =
+    state.history.length === 0
+      ? ''
+      : isDuel
+        ? '本圈无人抢位，状元定格'
+        : '普通奖全部博完';
 
   return (
     <div className="screen screen--end">
@@ -46,7 +72,7 @@ export function EndScreen({ state, onRestart, onPlayAgain, soundEnabled, onToggl
         <SoundToggle enabled={soundEnabled} onToggle={onToggleSound} />
       </div>
 
-      {/* ── 状元加冕 ─────────────────────────────── */}
+      {/* ── 状元 / 擂主加冕 ───────────────────────── */}
       <section className="crowning">
         <span className="crowning__dust" aria-hidden="true">
           {GOLD_DUST.map((d, i) => (
@@ -59,19 +85,20 @@ export function EndScreen({ state, onRestart, onPlayAgain, soundEnabled, onToggl
             <div className="crowning__crown">
               <Crown size={86} />
             </div>
-            <p className="crowning__eyebrow">本轮状元 · 加冕</p>
+            <p className="crowning__eyebrow">{isDuel ? '本轮擂主 · 加冕' : '本轮状元 · 加冕'}</p>
             <h1 className="crowning__name">{zyPlayer.name}</h1>
             <p className="crowning__prize">
               <RedFlower size={26} />
               {state.zhuangyuan?.result.prize}
             </p>
             <p className="crowning__desc">
-              {state.zhuangyuan?.result.desc} —— 博得头筹，独占状元饼！
+              {state.zhuangyuan?.result.desc} ——{' '}
+              {isDuel ? '守擂到最后，独占状元饼！' : '博得头筹，独占状元饼！'}
             </p>
           </div>
         ) : (
           <div className="crowning__inner">
-            <p className="crowning__eyebrow">本轮状元</p>
+            <p className="crowning__eyebrow">{isDuel ? '本轮擂主' : '本轮状元'}</p>
             <h1 className="crowning__name crowning__name--empty">状元空缺</h1>
             <p className="crowning__desc">这一夜谁都没博出状元，状元饼留待来年再争。</p>
           </div>
@@ -87,9 +114,45 @@ export function EndScreen({ state, onRestart, onPlayAgain, soundEnabled, onToggl
 
         <ul className="tally__grid">
           {ranked.map((player) => {
+            const isZy = player.id === zyId;
+
+            if (isDuel) {
+              return (
+                <li key={player.id} className={`tally-card${isZy ? ' is-zhuangyuan' : ''}`}>
+                  <div className="tally-card__head">
+                    <span className="tally-card__avatar" aria-hidden="true">
+                      {player.name.slice(0, 1)}
+                    </span>
+                    <span className="tally-card__name">
+                      {player.name}
+                      {isZy && <Crown size={20} className="tally-card__crown" />}
+                    </span>
+                    <span className="tally-card__total">
+                      <b>{player.turns}</b> 回合
+                    </span>
+                  </div>
+
+                  {player.best ? (
+                    <ul className="tally-card__prizes">
+                      <li className="tally-prize tally-prize--zhuangyuan tally-prize--stack">
+                        <RedFlower size={20} />
+                        <span className="tally-prize__name">
+                          {player.best.prize}
+                          {isZy && <em>状元饼</em>}
+                        </span>
+                        <span className="tally-prize__count">{player.best.desc}</span>
+                      </li>
+                      <li className="tally-meta">累计连掷 {player.rolls} 次</li>
+                    </ul>
+                  ) : (
+                    <p className="tally-card__none">本局未上场</p>
+                  )}
+                </li>
+              );
+            }
+
             const prizes = summarizePrizes(player);
             const total = countPrizes(player);
-            const isZy = player.id === zyId;
             return (
               <li key={player.id} className={`tally-card${isZy ? ' is-zhuangyuan' : ''}`}>
                 <div className="tally-card__head">

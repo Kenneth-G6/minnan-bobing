@@ -1,16 +1,31 @@
 /**
- * 历史记录 —— 轮次 / 玩家 / 骰子 / 奖项，最新在上
+ * 历史记录 —— 最新在上
+ *
+ * 经典模式按「掷」记录；状元争按「回合」记录（一次连掷只留一条）。
  */
 import type { HistoryEntry } from '../core/engine';
-import { PRIZE_META } from '../core/types';
+import { PRIZE_META, type GameMode } from '../core/types';
 import { Die } from './Die';
 
 export interface HistoryLogProps {
   history: HistoryEntry[];
+  /** 玩法模式，决定记录粒度 */
+  mode?: GameMode;
 }
 
-/** 把一次掷骰转成简明的结果文案 */
-function outcomeLabel(entry: HistoryEntry): { text: string; kind: string } {
+/** 把一次掷骰 / 一个回合转成简明的结果文案 */
+function outcomeLabel(entry: HistoryEntry, mode: GameMode): { text: string; kind: string } {
+  if (mode === 'zhuangyuan') {
+    const prefix = `连掷 ${entry.rolls ?? 1} 次 · `;
+    if (entry.zhuangyuanChange === 'became') {
+      return { text: `${prefix}${entry.result.prize} · 成为擂主`, kind: 'zhuangyuan' };
+    }
+    if (entry.zhuangyuanChange === 'replaced') {
+      return { text: `${prefix}${entry.result.prize} · 抢过擂主`, kind: 'zhuangyuan' };
+    }
+    return { text: `${prefix}${entry.result.prize} · 未超过擂主`, kind: 'keep' };
+  }
+
   if (entry.awarded) {
     return { text: `中奖 · ${PRIZE_META[entry.awarded].name}`, kind: 'award' };
   }
@@ -29,9 +44,15 @@ function outcomeLabel(entry: HistoryEntry): { text: string; kind: string } {
   return { text: '无奖', kind: 'none' };
 }
 
-export function HistoryLog({ history }: HistoryLogProps) {
+export function HistoryLog({ history, mode = 'classic' }: HistoryLogProps) {
+  const isDuel = mode === 'zhuangyuan';
+
   if (history.length === 0) {
-    return <p className="history__empty">还没开始掷骰，第一碗花落谁家？</p>;
+    return (
+      <p className="history__empty">
+        {isDuel ? '还没开博，第一个博中状元类的人就是擂主。' : '还没开始掷骰，第一碗花落谁家？'}
+      </p>
+    );
   }
 
   // 最新在上
@@ -40,10 +61,12 @@ export function HistoryLog({ history }: HistoryLogProps) {
   return (
     <ol className="history">
       {rows.map((entry) => {
-        const label = outcomeLabel(entry);
+        const label = outcomeLabel(entry, mode);
         return (
           <li key={entry.seq} className={`history__row history__row--${label.kind}`}>
-            <span className="history__round">第{entry.round}轮</span>
+            <span className="history__round">
+              {isDuel ? `第${entry.round}圈` : `第${entry.round}轮`}
+            </span>
 
             <span className="history__player" title={entry.playerName}>
               {entry.playerName}
